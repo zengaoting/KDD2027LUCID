@@ -1,19 +1,19 @@
-数据集概述
+Dataset Overview
 ----------
-Twitter-1.90是一个用于社区检测（Community Detection）任务的社交媒体网络数据集。该数据集基于Twitter社交平台构建，包含用户、关注关系、节点特征以及真实的社区标注信息。
+Twitter-1.90 is a social media network dataset used for Community Detection tasks. This dataset is constructed based on the Twitter social platform and contains users, following relationships, node features, and real community ground-truth information.
 
-数据集规模
+Dataset Scale
 ----------
-- 节点总数：87,760个节点（节点ID范围：0-87759）
-- 边总数：1,293,984条无向边
-- 社区数量：2,837个标注社区
-- 节点特征维度：19维特征向量
+- Total Nodes: 87,760 nodes (Node ID range: 0-87759)
+- Total Edges: 1,293,984 undirected edges
+- Number of Communities: 2,837 labeled communities
+- Node Feature Dimension: 19-dimensional feature vectors
 
-- 社区规模统计：
-  * 平均社区大小：约10.9个节点
+- Community Scale Statistics:
+  * Average community size: Approximately 10.9 nodes
 
-注意
+Note
 ----------
-- 图中存在部分节点未出现在社区标注中
-- 社区可能存在重叠（overlapping communities），即一个节点可能属于多个社区
-- 节点特征为19维数值型特征，在使用前建议进行归一化处理
+- There are some nodes in the graph that do not appear in the community labels
+- Communities may have overlaps (overlapping communities), meaning a single node may belong to multiple communities
+- Node features are 19-dimensional numerical features; normalization is suggested before use
