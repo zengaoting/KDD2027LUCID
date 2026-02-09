@@ -1,18 +1,18 @@
-数据集概述
+Dataset Overview
 ----------
-Amazon-1.90是一个用于社区检测（Community Detection）任务的产品共购网络数据集。该数据集基于Amazon电商平台的产品共购关系构建，包含节点、边以及真实的社区标注信息。
+Amazon-1.90 is a product co-purchasing network dataset used for Community Detection tasks. This dataset is constructed based on product co-purchasing relationships on the Amazon e-commerce platform and contains nodes, edges, and real community ground-truth information.
 
-数据集规模
+Dataset Scale
 ----------
-- 节点总数：13,178个节点（节点ID范围：0-13177）
-- 边总数：33,766条无向边
-- 社区数量：4,516个标注社区
-- 节点特征维度：无节点特征文件
+- Total Nodes: 13,178 nodes (Node ID range: 0-13177)
+- Total Edges: 33,766 undirected edges
+- Number of Communities: 4,516 labeled communities
+- Node Feature Dimension: No node feature file
 
-- 社区规模统计：
-  * 平均社区大小：约9.3个节点
+- Community Scale Statistics:
+  * Average community size: Approximately 9.3 nodes
 
-注意
+Note
 ----------
-- 图中存在部分节点未出现在社区标注中
-- 社区可能存在重叠（overlapping communities），即一个节点可能属于多个社区
+- There are some nodes in the graph that do not appear in the community labels
+- Communities may have overlaps (overlapping communities), meaning a single node may belong to multiple communities
