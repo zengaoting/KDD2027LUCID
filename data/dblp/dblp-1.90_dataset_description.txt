@@ -1,18 +1,18 @@
-数据集概述
+Dataset Overview
 ----------
-DBLP-1.90是一个用于社区检测（Community Detection）任务的学术合作网络数据集。该数据集基于DBLP（Digital Bibliography & Library Project）学术数据库构建，包含作者、合作关系以及真实的社区标注信息。
+DBLP-1.90 is an academic collaboration network dataset used for Community Detection tasks. This dataset is constructed based on the DBLP (Digital Bibliography & Library Project) academic database and contains authors, collaboration relationships, and real community ground-truth information.
 
-数据集规模
+Dataset Scale
 ----------
-- 节点总数：114,095个节点（节点ID范围：0-114094）
-- 边总数：466,760条无向边
-- 社区数量：4,558个标注社区
-- 节点特征维度：无节点特征文件
+- Total Nodes: 114,095 nodes (Node ID range: 0-114094)
+- Total Edges: 466,760 undirected edges
+- Number of Communities: 4,558 labeled communities
+- Node Feature Dimension: No node feature file
 
-- 社区规模统计：
-  * 平均社区大小：约8.4个节点
+- Community Scale Statistics:
+  * Average community size: Approximately 8.4 nodes
 
-注意
+Note
 ----------
-- 图中存在部分节点未出现在社区标注中
-- 社区可能存在重叠（overlapping communities），即一个节点可能属于多个社区
+- There are some nodes in the graph that do not appear in the community labels
+- Communities may have overlaps (overlapping communities), meaning a single node may belong to multiple communities
