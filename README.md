@@ -29,8 +29,6 @@ KDD2026LUCID/
 ├── snap_datasets.py          # Dataset loading functions
 ├── evaluate.py               # Evaluation metrics
 ├── README.md                 # This file
-├── DATA_README.md            # Detailed data file documentation
-├── .gitignore                # Git ignore rules
 └── data/                     # Data directory
     ├── facebook/
     │   └── facebook-1.90_dataset_description.txt  
@@ -46,15 +44,17 @@ KDD2026LUCID/
 
 ### Environmental Requirements
 
-1. Python 3.7 or above
-2. Pytorch
-3. Pytorch-Geometric (PyG)
-4. OpenAI
-5. Other dependencies: numpy, scipy, scikit-learn, tqdm, crowdkit, joblib
+1. python 3.11
+2. pytorch
+3. pytorch-geometric (PyG)
+4. openai
+5. Other dependencies: numpy, scipy, scikit-learn, tqdm, crowd-kit, joblib
 
 Install dependencies:
 ```bash
-pip install torch torch-geometric numpy scipy scikit-learn tqdm openai crowdkit joblib
+conda create -n lucid python=3.11 -y
+conda activate lucid
+pip install torch torch-geometric numpy scipy scikit-learn tqdm openai crowd-kit joblib
 ```
 
 ### Running LUCID
@@ -70,7 +70,7 @@ Execute `run.py` for the overall LUCID pipeline:
 python run.py --dataset=DATASET_NAME --device=DEVICE
 ```
 
-Descriptions of arguments (for more options, please refer to `run.py`)
+Descriptions of arguments
 ```bash
 --dataset [facebook, amazon, dblp, twitter, lj]: the dataset to run 
 --k: number of hops for ego network, default as 2
