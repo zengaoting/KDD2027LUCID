@@ -1,0 +1,497 @@
+LLM Response for Merge Stage (Amazon)
+================================================================================
+{
+  "merge_decision_tree": {
+    "nodes": [
+      {
+        "node_id": "root",
+        "kind": "rule",
+        "name": "gate_by_overlap_jaccard_and_count",
+        "code": "def rule_fn(meta):\n    c = set(meta['center_k_ego_nodes'])\n    n = set(meta['neighbor_k_ego_nodes'])\n    inter = len(c & n)\n    union = len(c | n)\n    j = inter / union if union else 0.0\n    return (inter >= 3 and j >= 0.20) or (inter >= 8 and j >= 0.12)",
+        "true_child": "r2_center_in_neighbor_and_neighbor_in_center",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r2_center_in_neighbor_and_neighbor_in_center",
+        "kind": "rule",
+        "name": "reciprocal_containment",
+        "code": "def rule_fn(meta):\n    c_nodes = meta['center_k_ego_nodes']\n    n_nodes = meta['neighbor_k_ego_nodes']\n    c_center = meta.get('center_node_id', None)\n    n_id = meta.get('neighbor_node_id', None)\n    nset = set(n_nodes)\n    cset = set(c_nodes)\n    ok1 = True if c_center is None else (c_center in nset)\n    ok2 = True if n_id is None else (n_id in cset)\n    return ok1 and ok2",
+        "true_child": "r3_size_ratio_balance",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r3_size_ratio_balance",
+        "kind": "rule",
+        "name": "size_balance",
+        "code": "def rule_fn(meta):\n    cs = len(meta['center_k_ego_nodes'])\n    ns = len(meta['neighbor_k_ego_nodes'])\n    if cs == 0 or ns == 0:\n        return False\n    r = min(cs, ns) / max(cs, ns)\n    return r >= 0.45",
+        "true_child": "r4_merged_size_cap",
+        "false_child": "r3b_allow_if_high_overlap",
+        "false_child_legacy": "leaf_no_merge"
+      },
+      {
+        "node_id": "r3b_allow_if_high_overlap",
+        "kind": "rule",
+        "name": "override_size_imbalance_if_very_high_overlap",
+        "code": "def rule_fn(meta):\n    c = set(meta['center_k_ego_nodes'])\n    n = set(meta['neighbor_k_ego_nodes'])\n    inter = len(c & n)\n    union = len(c | n)\n    j = inter / union if union else 0.0\n    return inter >= 10 and j >= 0.28",
+        "true_child": "r4_merged_size_cap",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r4_merged_size_cap",
+        "kind": "rule",
+        "name": "cap_merged_size_for_dataset_scale",
+        "code": "def rule_fn(meta):\n    current = set(meta.get('current_community', meta['center_k_ego_nodes']))\n    n = set(meta['neighbor_k_ego_nodes'])\n    merged_size = len(current | n)\n    return merged_size <= 60",
+        "true_child": "r5_density_similarity",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r5_density_similarity",
+        "kind": "rule",
+        "name": "density_similarity_from_adjacency",
+        "code": "def rule_fn(meta):\n    c_nodes = meta['center_k_ego_nodes']\n    n_nodes = meta['neighbor_k_ego_nodes']\n    c_adj = meta['center_k_ego_adjacency_list']\n    n_adj = meta['neighbor_k_ego_adjacency_list']\n    def dens(nodes, adj):\n        s = set(nodes)\n        m2 = 0\n        for u, vs in adj.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        m = m2 / 2.0\n        k = len(s)\n        return (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n    dc = dens(c_nodes, c_adj)\n    dn = dens(n_nodes, n_adj)\n    sim = 1.0 - (abs(dc - dn) / max(dc, dn, 0.05))\n    return sim >= 0.55",
+        "true_child": "r6_inter_edge_strength",
+        "false_child": "r5b_allow_if_overlap_strong_and_dense",
+        "false_child_legacy": "leaf_no_merge"
+      },
+      {
+        "node_id": "r5b_allow_if_overlap_strong_and_dense",
+        "kind": "rule",
+        "name": "override_density_mismatch_if_overlap_strong",
+        "code": "def rule_fn(meta):\n    c = set(meta['center_k_ego_nodes'])\n    n = set(meta['neighbor_k_ego_nodes'])\n    inter = len(c & n)\n    union = len(c | n)\n    j = inter / union if union else 0.0\n    c_adj = meta['center_k_ego_adjacency_list']\n    def dens(nodes, adj):\n        s = set(nodes)\n        m2 = 0\n        for u, vs in adj.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        m = m2 / 2.0\n        k = len(s)\n        return (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n    dc = dens(meta['center_k_ego_nodes'], c_adj)\n    return inter >= 12 and j >= 0.30 and dc >= 0.12",
+        "true_child": "r6_inter_edge_strength",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r6_inter_edge_strength",
+        "kind": "rule",
+        "name": "cross_edges_between_center_and_neighbor",
+        "code": "def rule_fn(meta):\n    c = set(meta.get('current_community', meta['center_k_ego_nodes']))\n    n = set(meta['neighbor_k_ego_nodes'])\n    c_adj = meta['center_k_ego_adjacency_list']\n    n_adj = meta['neighbor_k_ego_adjacency_list']\n    # approximate cross-edges as edges from center-side adjacency and neighbor-side adjacency\n    e = 0\n    for u, vs in c_adj.items():\n        if u in c:\n            e += sum(1 for v in vs if v in n)\n    for u, vs in n_adj.items():\n        if u in n:\n            e += sum(1 for v in vs if v in c)\n    e = e / 2.0\n    inter = len(c & n)\n    # require at least a few cross links beyond the shared nodes\n    return e >= max(2.0, 0.15 * inter)",
+        "true_child": "r7_label_agreement_on_overlap",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r7_label_agreement_on_overlap",
+        "kind": "rule",
+        "name": "label_agreement_on_overlapping_nodes",
+        "code": "def rule_fn(meta):\n    c_nodes = meta['center_k_ego_nodes']\n    n_nodes = meta['neighbor_k_ego_nodes']\n    c_labels = meta['center_k_ego_labels']\n    n_labels = meta['neighbor_k_ego_labels']\n    c_map = {u: c_labels[i] for i, u in enumerate(c_nodes) if i < len(c_labels)}\n    n_map = {u: n_labels[i] for i, u in enumerate(n_nodes) if i < len(n_labels)}\n    overlap = set(c_map) & set(n_map)\n    if len(overlap) < 3:\n        return False\n    agree = sum(1 for u in overlap if c_map.get(u) == n_map.get(u))\n    return (agree / len(overlap)) >= 0.55",
+        "true_child": "r8_label_mode_alignment",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r8_label_mode_alignment",
+        "kind": "rule",
+        "name": "dominant_label_alignment",
+        "code": "def rule_fn(meta):\n    from collections import Counter\n    c_labels = list(meta['center_k_ego_labels'])\n    n_labels = list(meta['neighbor_k_ego_labels'])\n    if not c_labels or not n_labels:\n        return False\n    cm = Counter(c_labels).most_common(1)[0][0]\n    nm = Counter(n_labels).most_common(1)[0][0]\n    return cm == nm or (Counter(c_labels)[nm] / len(c_labels) >= 0.35) or (Counter(n_labels)[cm] / len(n_labels) >= 0.35)",
+        "true_child": "r9_union_cohesion_not_worse",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r9_union_cohesion_not_worse",
+        "kind": "rule",
+        "name": "union_density_not_much_worse_than_parts",
+        "code": "def rule_fn(meta):\n    c_nodes = meta.get('current_community', meta['center_k_ego_nodes'])\n    n_nodes = meta['neighbor_k_ego_nodes']\n    c_adj = meta['center_k_ego_adjacency_list']\n    n_adj = meta['neighbor_k_ego_adjacency_list']\n    U = set(c_nodes) | set(n_nodes)\n    def dens_set(s, adj1, adj2):\n        m2 = 0\n        for u, vs in adj1.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        for u, vs in adj2.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        m = (m2 / 2.0)\n        k = len(s)\n        return (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n    def dens_nodes(nodes, adj):\n        s = set(nodes)\n        m2 = 0\n        for u, vs in adj.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        m = m2 / 2.0\n        k = len(s)\n        return (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n    dc = dens_nodes(c_nodes, c_adj)\n    dn = dens_nodes(n_nodes, n_adj)\n    du = dens_set(U, c_adj, n_adj)\n    baseline = min(max(dc, 0.01), max(dn, 0.01))\n    return du >= 0.65 * baseline",
+        "true_child": "r10_bridge_nodes_support",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "r10_bridge_nodes_support",
+        "kind": "rule",
+        "name": "multiple_shared_high_degree_nodes",
+        "code": "def rule_fn(meta):\n    c = set(meta.get('current_community', meta['center_k_ego_nodes']))\n    n = set(meta['neighbor_k_ego_nodes'])\n    overlap = list(c & n)\n    if len(overlap) < 4:\n        return False\n    c_adj = meta['center_k_ego_adjacency_list']\n    # count overlap nodes that are well-connected within current center community\n    good = 0\n    for u in overlap:\n        vs = c_adj.get(u, [])\n        deg_in_c = sum(1 for v in vs if v in c)\n        if deg_in_c >= 3:\n            good += 1\n    return good >= 2",
+        "true_child": "leaf_merge",
+        "false_child": "leaf_no_merge"
+      },
+      {
+        "node_id": "leaf_merge",
+        "kind": "leaf",
+        "name": "merge_neighbor",
+        "action": "merge"
+      },
+      {
+        "node_id": "leaf_no_merge",
+        "kind": "leaf",
+        "name": "keep_separate",
+        "action": "no_merge"
+      }
+    ],
+    "sample_decisions": [
+      {
+        "sample_id": 0,
+        "neighbor_id": 4816,
+        "merge": true,
+        "path": [
+          "root",
+          "r2_center_in_neighbor_and_neighbor_in_center",
+          "r3_size_ratio_balance",
+          "r4_merged_size_cap",
+          "r5_density_similarity",
+          "r6_inter_edge_strength",
+          "r7_label_agreement_on_overlap",
+          "r8_label_mode_alignment",
+          "r9_union_cohesion_not_worse",
+          "r10_bridge_nodes_support",
+          "leaf_merge"
+        ],
+        "merged_nodes": [
+          1000,
+          1056,
+          1099,
+          1150,
+          1260,
+          1581,
+          3666,
+          3869,
+          4186,
+          4816,
+          5329,
+          6170,
+          6611,
+          7657,
+          8482,
+          8595,
+          9511,
+          9566,
+          10112,
+          10134,
+          10476,
+          10580,
+          11203,
+          11643,
+          12813
+        ],
+        "reason": "Very high node overlap (almost identical ego shells), reciprocal containment, similar density, strong cross-links, and consistent dominant labels; union cohesion preserved."
+      },
+      {
+        "sample_id": 0,
+        "neighbor_id": 1000,
+        "merge": true,
+        "path": [
+          "root",
+          "r2_center_in_neighbor_and_neighbor_in_center",
+          "r3_size_ratio_balance",
+          "r4_merged_size_cap",
+          "r5_density_similarity",
+          "r6_inter_edge_strength",
+          "r7_label_agreement_on_overlap",
+          "r8_label_mode_alignment",
+          "r9_union_cohesion_not_worse",
+          "r10_bridge_nodes_support",
+          "leaf_merge"
+        ],
+        "merged_nodes": [
+          1000,
+          1099,
+          1150,
+          1581,
+          3666,
+          3869,
+          4186,
+          4816,
+          5329,
+          5365,
+          6170,
+          6611,
+          7657,
+          8482,
+          8595,
+          9566,
+          10112,
+          10134,
+          10476,
+          10580,
+          11203,
+          11643,
+          12813
+        ],
+        "reason": "Substantial overlap and connectivity; densities and label modes align; merged subgraph remains cohesive and within size cap."
+      },
+      {
+        "sample_id": 1,
+        "neighbor_id": 321,
+        "merge": false,
+        "path": [
+          "root",
+          "leaf_no_merge"
+        ],
+        "merged_nodes": [
+          321,
+          666,
+          1824,
+          1986
+        ],
+        "reason": "Fails conservative overlap gate for small egos (intersection too small relative to union); avoids collapsing tiny star-like structures."
+      },
+      {
+        "sample_id": 2,
+        "neighbor_id": 3595,
+        "merge": true,
+        "path": [
+          "root",
+          "r2_center_in_neighbor_and_neighbor_in_center",
+          "r3_size_ratio_balance",
+          "r4_merged_size_cap",
+          "r5_density_similarity",
+          "r6_inter_edge_strength",
+          "r7_label_agreement_on_overlap",
+          "r8_label_mode_alignment",
+          "r9_union_cohesion_not_worse",
+          "r10_bridge_nodes_support",
+          "leaf_merge"
+        ],
+        "merged_nodes": [
+          143,
+          409,
+          529,
+          1427,
+          1823,
+          2189,
+          2587,
+          3595,
+          3715,
+          4373,
+          4992,
+          5263,
+          5280,
+          5599,
+          6512,
+          7085,
+          7804,
+          8036,
+          8060,
+          9060,
+          9831,
+          11133,
+          11428,
+          11721,
+          12480
+        ],
+        "reason": "Large shared core around {409,4373,5599,8060,...} with balanced sizes and strong cross-edges; label distributions broadly aligned; union density remains acceptable."
+      },
+      {
+        "sample_id": 2,
+        "neighbor_id": 2587,
+        "merge": true,
+        "path": [
+          "root",
+          "r2_center_in_neighbor_and_neighbor_in_center",
+          "r3_size_ratio_balance",
+          "r4_merged_size_cap",
+          "r5_density_similarity",
+          "r6_inter_edge_strength",
+          "r7_label_agreement_on_overlap",
+          "r8_label_mode_alignment",
+          "r9_union_cohesion_not_worse",
+          "r10_bridge_nodes_support",
+          "leaf_merge"
+        ],
+        "merged_nodes": [
+          143,
+          409,
+          529,
+          1030,
+          1427,
+          1823,
+          2189,
+          2587,
+          3595,
+          3715,
+          4373,
+          4992,
+          5263,
+          5280,
+          5599,
+          6512,
+          7085,
+          7804,
+          8036,
+          8060,
+          9060,
+          9831,
+          11133,
+          11428,
+          11721,
+          12480
+        ],
+        "reason": "Neighbor ego is almost a subset of center ego with heavy overlap; connectivity through 8060/409 is strong; cohesion preserved under cap."
+      },
+      {
+        "sample_id": 2,
+        "neighbor_id": 8036,
+        "merge": true,
+        "path": [
+          "root",
+          "r2_center_in_neighbor_and_neighbor_in_center",
+          "r3_size_ratio_balance",
+          "r4_merged_size_cap",
+          "r5_density_similarity",
+          "r6_inter_edge_strength",
+          "r7_label_agreement_on_overlap",
+          "r8_label_mode_alignment",
+          "r9_union_cohesion_not_worse",
+          "r10_bridge_nodes_support",
+          "leaf_merge"
+        ],
+        "merged_nodes": [
+          143,
+          409,
+          529,
+          1030,
+          1427,
+          1823,
+          2189,
+          2587,
+          2654,
+          3595,
+          3715,
+          4373,
+          4992,
+          5263,
+          5280,
+          5599,
+          6512,
+          7085,
+          7804,
+          8036,
+          8060,
+          9060,
+          9831,
+          11133,
+          11428,
+          11721,
+          12480,
+          13021
+        ],
+        "reason": "High-overlap core plus a few coherent extensions (5263/2654/13021) still within size cap; strong cross connectivity through 8060/5599; label mode not conflicting."
+      }
+    ]
+  },
+  "merge_execution_function": {
+    "code_degree": "def merge_k_ego_networks(center_k_ego_nodes, center_k_ego_degrees, center_k_ego_labels, neighbor_k_ego_networks, current_community=None):\n    merged = set(current_community) if current_community else set(center_k_ego_nodes)\n    cset0 = set(center_k_ego_nodes)\n    clmap0 = {u: center_k_ego_labels[i] for i, u in enumerate(center_k_ego_nodes) if i < len(center_k_ego_labels)}\n    if center_k_ego_degrees and len(center_k_ego_degrees) == len(center_k_ego_nodes):\n        cd = sum(center_k_ego_degrees) / max(1, len(center_k_ego_degrees))\n    else:\n        cd = 0.0\n    for neighbor_id, n_nodes, n_degrees, n_labels in neighbor_k_ego_networks:\n        nset = set(n_nodes)\n        inter = len(cset0 & nset)\n        union = len(cset0 | nset)\n        j = inter / union if union else 0.0\n        if not ((inter >= 3 and j >= 0.20) or (inter >= 8 and j >= 0.12)):\n            continue\n        if neighbor_id not in cset0:\n            continue\n        if len(n_nodes) == 0 or len(center_k_ego_nodes) == 0:\n            continue\n        r = min(len(center_k_ego_nodes), len(n_nodes)) / max(len(center_k_ego_nodes), len(n_nodes))\n        if r < 0.45:\n            if not (inter >= 10 and j >= 0.28):\n                continue\n        if len(merged | nset) > 60:\n            continue\n        nd = (sum(n_degrees) / max(1, len(n_degrees))) if (n_degrees and len(n_degrees) == len(n_nodes)) else 0.0\n        sim = 1.0 - (abs(cd - nd) / max(cd, nd, 1.0))\n        if sim < 0.25 and not (inter >= 12 and j >= 0.30):\n            continue\n        nlmap = {u: n_labels[i] for i, u in enumerate(n_nodes) if i < len(n_labels)}\n        ov = [u for u in clmap0.keys() if u in nlmap]\n        if len(ov) < 3:\n            continue\n        agree = sum(1 for u in ov if clmap0.get(u) == nlmap.get(u)) / len(ov)\n        if agree < 0.55:\n            continue\n        from collections import Counter\n        if not center_k_ego_labels or not n_labels:\n            continue\n        cm = Counter(center_k_ego_labels).most_common(1)[0][0]\n        nm = Counter(n_labels).most_common(1)[0][0]\n        cC = Counter(center_k_ego_labels)\n        nC = Counter(n_labels)\n        if not (cm == nm or (cC.get(nm, 0) / len(center_k_ego_labels) >= 0.35) or (nC.get(cm, 0) / len(n_labels) >= 0.35)):\n            continue\n        merged |= nset\n    return list(merged)",
+    "code_adjacency_list": "def merge_k_ego_networks(center_k_ego_nodes, center_k_ego_adjacency_list, center_k_ego_labels, neighbor_k_ego_networks, current_community=None):\n    merged = set(current_community) if current_community else set(center_k_ego_nodes)\n    cset0 = set(center_k_ego_nodes)\n    clmap0 = {u: center_k_ego_labels[i] for i, u in enumerate(center_k_ego_nodes) if i < len(center_k_ego_labels)}\n    def dens(nodes, adj):\n        s = set(nodes)\n        m2 = 0\n        for u, vs in adj.items():\n            if u in s:\n                m2 += sum(1 for v in vs if v in s)\n        m = m2 / 2.0\n        k = len(s)\n        return (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n    dc0 = dens(center_k_ego_nodes, center_k_ego_adjacency_list)\n    from collections import Counter\n    c_mode = Counter(center_k_ego_labels).most_common(1)[0][0] if center_k_ego_labels else None\n    c_count = Counter(center_k_ego_labels)\n    for neighbor_id, n_nodes, n_adj, n_labels in neighbor_k_ego_networks:\n        nset = set(n_nodes)\n        inter = len(cset0 & nset)\n        union = len(cset0 | nset)\n        j = inter / union if union else 0.0\n        if not ((inter >= 3 and j >= 0.20) or (inter >= 8 and j >= 0.12)):\n            continue\n        if neighbor_id not in cset0:\n            continue\n        if not center_k_ego_nodes or not n_nodes:\n            continue\n        r = min(len(center_k_ego_nodes), len(n_nodes)) / max(len(center_k_ego_nodes), len(n_nodes))\n        if r < 0.45 and not (inter >= 10 and j >= 0.28):\n            continue\n        if len(merged | nset) > 60:\n            continue\n        dn = dens(n_nodes, n_adj)\n        sim = 1.0 - (abs(dc0 - dn) / max(dc0, dn, 0.05))\n        if sim < 0.55:\n            if not (inter >= 12 and j >= 0.30 and dc0 >= 0.12):\n                continue\n        e = 0\n        for u, vs in center_k_ego_adjacency_list.items():\n            if u in merged:\n                e += sum(1 for v in vs if v in nset)\n        for u, vs in n_adj.items():\n            if u in nset:\n                e += sum(1 for v in vs if v in merged)\n        e = e / 2.0\n        if e < max(2.0, 0.15 * len(merged & nset)):\n            continue\n        nlmap = {u: n_labels[i] for i, u in enumerate(n_nodes) if i < len(n_labels)}\n        ov = [u for u in clmap0.keys() if u in nlmap]\n        if len(ov) < 3:\n            continue\n        agree = sum(1 for u in ov if clmap0.get(u) == nlmap.get(u)) / len(ov)\n        if agree < 0.55:\n            continue\n        if not n_labels or c_mode is None:\n            continue\n        nC = Counter(n_labels)\n        n_mode = nC.most_common(1)[0][0]\n        if not (c_mode == n_mode or (c_count.get(n_mode, 0) / len(center_k_ego_labels) >= 0.35) or (nC.get(c_mode, 0) / len(n_labels) >= 0.35)):\n            continue\n        U = merged | nset\n        m2 = 0\n        for u, vs in center_k_ego_adjacency_list.items():\n            if u in U:\n                m2 += sum(1 for v in vs if v in U)\n        for u, vs in n_adj.items():\n            if u in U:\n                m2 += sum(1 for v in vs if v in U)\n        m = (m2 / 2.0)\n        k = len(U)\n        du = (m / (k * (k - 1) / 2.0)) if k > 1 else 0.0\n        baseline = min(max(dens(list(merged), center_k_ego_adjacency_list), 0.01), max(dn, 0.01))\n        if du < 0.65 * baseline:\n            continue\n        overlap = list(merged & nset)\n        good = 0\n        if len(overlap) >= 4:\n            for u in overlap:\n                vs = center_k_ego_adjacency_list.get(u, [])\n                if sum(1 for v in vs if v in merged) >= 3:\n                    good += 1\n        if good < 2:\n            continue\n        merged |= nset\n    return list(merged)"
+  }
+}
+================================================================================
+
+LLM Response for Refine Stage (Amazon)
+================================================================================
+def batch_refine_communities(communities):
+    import numpy as np
+    out = {}
+    if not isinstance(communities, list):
+        return out
+    for ci, c in enumerate(communities):
+        nodes = c.get('nodes') if isinstance(c, dict) else None
+        if not nodes:
+            out[ci] = []
+            continue
+        S = set(int(x) for x in nodes if isinstance(x, (int, np.integer)) or (isinstance(x, bool) is False and str(x).lstrip("-").isdigit()))
+        if not S:
+            out[ci] = []
+            continue
+        adj = c.get('adjacency_list') if isinstance(c, dict) else None
+        deg_inp = c.get('degree') if isinstance(c, dict) else None
+        labels = c.get('node_labels') if isinstance(c, dict) else None
+        if not isinstance(labels, dict):
+            labels = None
+
+        # Build internal neighbor lists, internal degrees
+        nbrs_in = {}
+        ideg = {}
+        if isinstance(adj, dict):
+            for u in S:
+                nu = adj.get(u, [])
+                if not isinstance(nu, (list, tuple, set, np.ndarray)):
+                    nu = []
+                lst = [int(v) for v in nu if v in S]
+                nbrs_in[u] = lst
+                ideg[u] = len(lst)
+        else:
+            nbrs_in = {u: [] for u in S}
+            if isinstance(deg_inp, dict):
+                ideg = {u: int(deg_inp.get(u, 0) or 0) for u in S}
+            elif isinstance(deg_inp, (list, tuple, np.ndarray)) and len(deg_inp) > 0:
+                nmax = max(S)
+                arr = np.asarray(deg_inp)
+                ideg = {u: int(arr[u]) if 0 <= u < len(arr) else 0 for u in S}
+            else:
+                ideg = {u: 0 for u in S}
+
+        n = len(S)
+        m2 = sum(ideg.values())
+        avg_deg = (m2 / n) if n else 0.0
+        if avg_deg < 1.0:
+            avg_deg = 1.0
+
+        # Label majority (within community)
+        maj_label = None
+        if labels:
+            cnt = {}
+            for u in S:
+                lab = labels.get(u, None)
+                if lab is None:
+                    continue
+                cnt[lab] = cnt.get(lab, 0) + 1
+            if cnt:
+                maj_label = max(cnt.items(), key=lambda x: x[1])[0]
+
+        # Score each node (higher => more likely drop)
+        drop = []
+        # thresholds scaled for small communities; community size ~9 typical
+        min_keep_deg = 1 if n <= 6 else 2
+        deg_q25 = None
+        try:
+            deg_q25 = float(np.quantile(np.fromiter(ideg.values(), dtype=float), 0.25))
+        except Exception:
+            deg_q25 = None
+
+        # Precompute neighbor sets for triangle checks only when adj given
+        if isinstance(adj, dict):
+            nbset = {u: set(nbrs_in[u]) for u in S}
+        else:
+            nbset = None
+
+        for u in S:
+            d = ideg.get(u, 0)
+            # structural: leaf / very low internal degree
+            low_deg = (d <= 1) or (d < min_keep_deg) or (deg_q25 is not None and d <= deg_q25 and d <= 2)
+            # topological: weak triadic support (few triangles relative to possible wedges)
+            tri_weak = False
+            if nbset is not None and d >= 2:
+                nu = nbrs_in[u]
+                # sample pairs via min of neighbors to keep O(d^2) bounded for dense cases
+                if len(nu) > 25:
+                    nu = nu[:25]
+                t = 0
+                for i in range(len(nu)):
+                    vi = nu[i]
+                    s_vi = nbset.get(vi, set())
+                    for j in range(i + 1, len(nu)):
+                        if nu[j] in s_vi:
+                            t += 1
+                possible = (len(nu) * (len(nu) - 1)) / 2.0
+                tri_weak = (possible > 0 and (t / possible) < 0.15)
+            # label: mismatch + low neighbor agreement
+            label_bad = False
+            if labels and maj_label is not None:
+                lu = labels.get(u, None)
+                if lu is not None and lu != maj_label:
+                    agree = 0
+                    tot = 0
+                    if nbset is not None:
+                        for v in nbrs_in[u]:
+                            lv = labels.get(v, None)
+                            if lv is None:
+                                continue
+                            tot += 1
+                            if lv == lu:
+                                agree += 1
+                    label_bad = (tot >= 2 and (agree / tot) < 0.34) or (d <= 1)
+
+            # Combine signals: drop if multiple weak signals or extreme leaf/no-support
+            bad = (low_deg and (tri_weak or label_bad)) or (d == 0) or (low_deg and n >= 8 and not labels)
+            if bad:
+                drop.append(u)
+
+        out[ci] = sorted(drop)
+    return out
+================================================================================
