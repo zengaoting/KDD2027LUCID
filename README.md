@@ -11,12 +11,18 @@ If you find this work useful in your method, you can cite the paper as below:
 ## Overview
 
 We propose LUCID, an LLM-guided interpretable, training-free and Unsupervised Community Detection method. Inspired by phase-transition kinetics in natural systems, LUCID is designed as a four-stage pipeline:
-
 1. **Local-View Community Initialization:** Decomposes the graph into localized k-ego networks and assigns unsupervised node role labels to capture structural semantics.
 2. **Multi-factor Community Merge:** Utilizes LLM-induced decision trees to evaluate structural compatibility and iteratively merge local communities using dynamic orchestration.
 3. **Multi-grain Community Refinement:** Applies LLM-generated coarse-to-fine rules in parallel to refine node memberships and eliminate boundary noise.
 4. **Global-view Community Selection:** Identifies high-quality communities using a structure-stability-regularized metric that balances internal cohesion and boundary clarity.
 
+The overall framework is illustrated in the figure below:
+
+<p align="center">
+  <img src="framework.png" alt="LUCID Framework" width="65%">
+  <br>
+  <em>Figure 1: The overall framework of LUCID, consisting of initialization, merging, refinement, and selection stages.</em>
+</p>
 
 ## Run the Codes
 
@@ -28,6 +34,8 @@ KDD2026LUCID/
 ├── utils.py                  # Utility functions (node labeling, file I/O)
 ├── snap_datasets.py          # Dataset loading functions
 ├── evaluate.py               # Evaluation metrics
+├── example_amazon_prompts.txt           # Example prompts for Amazon dataset
+├── example_amazon_llm_response.txt      # Example LLM response for Amazon dataset
 ├── README.md                 # This file
 └── data/                     # Data directory
     ├── facebook/
