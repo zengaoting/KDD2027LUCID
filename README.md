@@ -1,6 +1,7 @@
-# KDD2026LUCID
+# KDD2027LUCID
 
-This is the official repo for KDD 2026 Research Track paper ''**Interpretable Unsupervised Community Detection with LLM-Symbolized Structured Processes**''. 
+
+This is the official repo for KDD 2027 Research Track paper ''**Interpretable Unsupervised Community Detection with LLM-Symbolized Structured Processes**''. 
 
 
 If you find this work useful in your method, you can cite the paper as below:
